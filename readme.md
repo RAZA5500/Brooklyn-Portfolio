@@ -1,2 +1,2 @@
 # MADE WITH ❤️ BY RAZA
-# DEPLOY LINK : 
+# DEPLOY LINK : https://raza5500.github.io/Brooklyn-Portfolio/
