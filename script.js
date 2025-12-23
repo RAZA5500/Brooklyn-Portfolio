@@ -28,47 +28,75 @@ document.addEventListener('DOMContentLoaded', () => {
   // Blog slider drag-to-scroll and dots (safe guards)
   const slider = document.querySelector(".blog-grid");
   const dots = document.querySelectorAll(".blog-pagination .dot");
-  if (slider) {
+  if (slider && dots.length) {
+    // pointer-based drag (works for mouse & touch)
     let isDown = false;
     let startX = 0;
     let scrollLeft = 0;
 
-    slider.addEventListener("mousedown", (e) => {
+    slider.addEventListener("pointerdown", (e) => {
       isDown = true;
+      slider.setPointerCapture(e.pointerId);
       slider.classList.add("dragging");
-      startX = e.pageX - slider.offsetLeft;
+      startX = e.clientX;
       scrollLeft = slider.scrollLeft;
     });
 
-    window.addEventListener("mouseup", () => {
+    slider.addEventListener("pointerup", (e) => {
       isDown = false;
+      try { slider.releasePointerCapture(e.pointerId); } catch (err) {}
       slider.classList.remove("dragging");
     });
 
-    window.addEventListener("mousemove", (e) => {
+    slider.addEventListener("pointermove", (e) => {
       if (!isDown) return;
       e.preventDefault();
-      const x = e.pageX - slider.offsetLeft;
+      const x = e.clientX;
       const walk = (x - startX) * 1.2;
       slider.scrollLeft = scrollLeft - walk;
     });
 
-    if (dots.length) {
-      dots.forEach((dot, index) => {
-        dot.addEventListener("click", () => {
-          const scrollAmount = slider.scrollWidth / dots.length;
-          slider.scrollTo({ left: scrollAmount * index, behavior: "smooth" });
-          dots.forEach(d => d.classList.remove("active"));
-          dot.classList.add("active");
-        });
-      });
-
-      slider.addEventListener("scroll", () => {
-        const index = Math.round(slider.scrollLeft / (slider.scrollWidth / dots.length));
-        dots.forEach(d => d.classList.remove("active"));
-        if (dots[index]) dots[index].classList.add("active");
-      });
+    // compute usable scroll range and step per dot
+    function scrollRange() {
+      return Math.max(0, slider.scrollWidth - slider.clientWidth);
     }
+
+    function stepSize() {
+      const range = scrollRange();
+      return dots.length > 1 ? range / (dots.length - 1) : range;
+    }
+
+    // dot click => scroll to correct position
+    dots.forEach((dot, index) => {
+      dot.addEventListener("click", () => {
+        const left = Math.round(stepSize() * index);
+        slider.scrollTo({ left, behavior: "smooth" });
+        dots.forEach(d => d.classList.remove("active"));
+        dot.classList.add("active");
+      });
+    });
+
+    // update active dot on scroll (requestAnimationFrame for perf)
+    let raf = null;
+    slider.addEventListener("scroll", () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const range = scrollRange();
+        const ratio = range === 0 ? 0 : slider.scrollLeft / range;
+        const idx = Math.round(ratio * (dots.length - 1));
+        dots.forEach(d => d.classList.remove("active"));
+        if (dots[idx]) dots[idx].classList.add("active");
+      });
+    });
+
+    // keep behaviour correct on resize
+    window.addEventListener("resize", () => {
+      // recalc active based on new dimensions
+      slider.dispatchEvent(new Event("scroll"));
+    });
+
+    // initialize active dot
+    slider.dispatchEvent(new Event("scroll"));
   }
 
   // Scroll-top: ensure button exists, accessible, and works on click/touch/keyboard
